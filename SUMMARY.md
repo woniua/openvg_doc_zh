@@ -1,6 +1,6 @@
 # Summary
 
-* [Introduction](README.md)
+* [关于本文档](README.md)
 * [1 简介](chapter01/1_0_Introduction.md)
     * [1.1 特性集](chapter01/1_1_Feature_Set.md)
     * [1.2 目标应用](chapter01/1_2_Target_Applications.md)
