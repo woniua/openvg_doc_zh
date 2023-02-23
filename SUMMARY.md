@@ -1,7 +1,7 @@
 # Summary
 
 * [Introduction](README.md)
-* [关于本文档](src/README.md)
+* [关于本文档](src/00_About.md)
 * [1 简介](src/01_Introduction.md#简介)
     * [1.1 特性集](src/01_Introduction.md#特性集)
     * [1.2 目标应用](src/01_Introduction.md#目标应用)
