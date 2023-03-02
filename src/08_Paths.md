@@ -225,14 +225,42 @@ void processPath(const VGubyte * pathSegments, const void * pathData,
     }
 }
 ```
-
-
 ## 8.6 路径操作 <span id = "路径操作"></span>
+除了填充或描边路径外，`API`还允许对路径进行以下基本操作:
+ - 创建具有给定功能集的路径(`vgCreatePath`)
+ - 从路径中移除数据(`vgClearPath`)
+ - 销毁路径(`vgDestroyPath`)
+ - 查询路径信息(`vgGetParameter`)
+ - 查询路径的功能集(`vgGetPathCapabilities`)
+ - 减少路径的功能集(`vgRemovePathCapabilities`)
+ - 将数据从一个路径追加到另一个路径(`vgAppendPath`)
+ - 在路径上追加数据(`vgAppendPathData`)
+ - 修改路径中的坐标(`vgModifyPathCoords`)
+ - 路径转换(`vgModifyPathCoords`)
+ - 在两条路径之间进行插值(`vgInterpolatePath`)
+ - 确定路径的几何长度(`vgPathLength`)
+ - 获取路径上给定几何距离的点的位置和切线信息(`vgPointAlongPath`)
+ - 为路径获取一个轴对齐的包围框(`vgPathBounds`,`vgTransformedPathBounds`)
+
+高级几何原语在可选的VGU实用程序库中定义(参考章节17)：
+ - 在路径上追加一条线(`vguLine`)
+ - 将折线(线段连接序列)或多边形附加到路径(`vguRoundRect`)
+ - 将椭圆附加到路径上(`vguEllipse`)
+ - 将圆弧附加到路径上(`vguArc`)
+
 ### 8.6.1 路径存储
+`OpenVG`内部实现了路径数据的存储。路径可以通过`VGPath`句柄引用。应用程序可以使用上面定义的内存表示来初始化路径，也可以用扩展定义的其他形式定义路径。在硬件加速存储器中实现路径数据的存储是可能的，实现也可以使用它们自己内部的路径段。其目的是使应用程序能够定义一组路径，例如，当前字体中的每个字形都有一个路径，并且能够以最大效率重新呈现以前定义的每个路径。
+
+**`VGPath`**
+`VGPath`是可以用来引用路径的一个句柄。
+```
+typedef VGHandle VGPath;
+```
+
 ### 8.6.2 路径的销毁及创建
 函数`vgCreatePath`和`vgDestroyPath`分别用于路径的创建和销毁。在路径的整个生命周期内，应用程序可以通过定义枚举变量`VGPathCapabilities`指定哪条路径应该被执行。
 
-**VGPathCapabilities** 
+**`VGPathCapabilities`** 
 `VGPathCapabilities`定义了一组常量，该组常量描述了在一个给定的`路径对象`上可以执行哪些操作。在路径被定义的同时，应用程序同时指定在该路径上可以执行哪些操作。在随后的运行过程中，应用程序可以禁能先前使能的权限,但是一旦被禁能就不可以在重新使能。该特性允许OpenVG实现使用可能不支持所有路径操作的内部路径表示，这可能会在不执行这些操作的路径上获得更高的性能。
 位及相应的功能描述列出如下：
 
@@ -272,17 +300,51 @@ typedef enum {
 ```
 忽略当前路径能力的设置去调用`vgCreatePath`,`vgClearPath`,`vgDestroyPath`函数是被允许的，因为这些函数丢弃了现有的路径定义。
 
-**vgCreatePath**
+**`vgCreatePath`**
 
-todo
+`vgCreatePath`创建一个准备接受段数据的新路径，并返回一个`VGPath`句柄，路径数据根据给出的参数`pathFormat`做格式化，该参数多数情况下填入`VG_PATH_FORMAT_STANDARD`。`datatype`参数包含来自枚举变量`VGPathDatatype`的值，该值表示坐标数据的类型。`capabilities`参数是所需`VGPathCapabilities`的按位或。未与`VGPathCapabilities`中的值对应的功能位没有影响。如果发生错误，则返回`VG_INVALID_HANDLE`。
 
-**vgClearPath**
+`scale`和`bias`参数用于解释每个坐标的路径数据；输入的坐标值`v`将会被解释为`(scale * v + bias)`。`scale`参数必须不为零。`datatype`，`scale`，`bias`一起定义了一个路径有效坐标数据范围，在该范围之外的路径中放置坐标的分段命令将会溢出，导致出现未定义的坐标值，使用`vgPathLength`和`vgPointAlongPath`之类的查询函数查询该类值也将返回未定义的结果。
 
-todo
+`segmentCapacityHint`参数提供了最终可以存储在路径中的段的个数。`coordCapacityHint`参数提供了最终可以存储在路径中的坐标(见8.5.2章节中标的坐标列)的个数。小于等于零的值表示其能力未知。不管提示值为多少，路径存储空间在任何情况下都会根据需要增长，但是提供提示可以通过减少随着路径增长而分配额外空间的需要进而来提高性能。实现应该允许应用程序少量地追加段和协调指定的容量，而不会由于过度的内存重新分配使得性能降低。
+```
+VGPath vgCreatePath(VGint pathFormat,
+                    VGPathDatatype datatype,
+                    VGfloat scale, VGfloat bias,
+                    VGint segmentCapacityHint,
+                    VGint coordCapacityHint,
+                    VGbitfield capabilities)
+```
+> **`ERRORS`**
+> 
+> `VG_UNSUPPORTED_PATH_FORMAT_ERROR`
+>  - 如果`pathFormat`传入了不支持的格式
+> 
+> `VG_ILLEGAL_ARGUMENT_ERROR`
+>  - 如果`datatype`的传入值不是`VGPathDatatype`枚举标量中列出的值。
+> 如果`scale`等于0
 
-**vgDestroyPath**
+**`vgClearPath`**
 
-todo
+`vgClearPath`函数将绑定在路径上的段命令机器坐标移除。其句柄在执行该函数后将继续有效，其路径格式和数据类型保留现有的值。`capabilities`参数是所需`VGPathCapabilities`的按位或。未与`VGPathCapabilities`中的值对应的功能位没有影响。对于生命周期比较短的路径，使用`vgClearPath`可能比销毁和重新创建路径更有效。
+```
+void vgClearPath(VGPath path, VGbitfield capabilities)
+```
+> **`ERRORS`**
+> 
+> `VG_BAD_HANDLE_ERROR`
+>  - 如果`path`不是一个有效的路径句柄，或者没有在当前环境共享。
+
+**`vgDestroyPath`**
+
+`vgDestroyPath`释放与`path`关联的所有资源，并使句柄在共享它的所有上下文中无效。
+```
+void vgDestroyPath(VGPath path)
+```
+> **`ERRORS`**
+> 
+> `VG_BAD_HANDLE_ERROR`
+>  - 如果`path`不是一个有效的路径句柄，或者没有在当前环境共享。
 
 ### 8.6.3 路径查询
 ### 8.6.4 路径性能的查询及修改

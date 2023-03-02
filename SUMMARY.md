@@ -24,7 +24,7 @@
     * [3.2 数据类型](src/03_Functions_and_Data_Types.md#数据类型)
     * [3.3 浮点型及整型](src/03_Functions_and_Data_Types.md#浮点型及整型)
     * [3.4 颜色](src/03_Functions_and_Data_Types.md#颜色)
-    * [3.5 枚举类型](src/03_Functions_and_Data_Types.md#枚举类型)
+    * [3.5 枚举数据类型](src/03_Functions_and_Data_Types.md#枚举数据类型)
     * [3.6 句柄数据类型](src/03_Functions_and_Data_Types.md#句柄数据类型)
 * [4 绘图](src/04_Drawing_Context.md#绘图)
     * [4.1 错误码](src/04_Drawing_Context.md#错误码)
