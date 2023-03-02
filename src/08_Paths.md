@@ -92,11 +92,140 @@ G1平滑的二次段或三次段的初始点的平滑度可以通过放置合适
 | 保留| Reserved| 26,28,30| | | |
 | | | | | | |
 
-每个段类型都可以使用绝对坐标或相对坐标来定义。
+每个段类型都可以使用绝对坐标或相对坐标来定义。将相对坐标`(x,y)`添加到`(ox,oy)`可以得到绝对坐标`(ox+x,oy+y)`。在每个段渲染的过程中相对坐标立即转换为绝对坐标。
+
+提供`HLINE_TO`和`VLINE_TO`段类型是为了避免`SVG查看器`之类的应用程序在解析路径数据时执行自己的相对与绝对转换。
+
+在SVG中，平滑二次段和三次段的行为与上面定义的行为略有不同。如果一个光滑二次段没有跟在一个二次段后面，或者一个光滑三次段没有跟在一个三次段后面，则初始控制点`(x0, y0)`位于`(ox, oy)`，而不是计算为`(px, py)`的对称点。当与前一段的类型不一致时，其行为可以通过将SVG平滑段转换为指定其所有控制点的常规段来模拟。
+
+请注意，由于坐标是基于`(ox, oy)`， `(sx, sy)`和初始值为`(0,0)`的`(px, py)`，即使路径不是以`MOVE_TO`段(也包括`HLINE_TO`,` VLINE_TO`,或相对段类型)开始，路径的坐标也会被定义。
 
 ### 8.5.3 坐标数据格式
+坐标和参数数据(后面简称为坐标数据)可以用一组格式来表示,如下表所示。多字节的坐标数据(比如坐标数据类型为`S_16`,`S_32`及`F`)在应用程序内存中使用平台的本机字节顺序表示。具体实现时可以将`S_32`和`F`格式的传入数据量化为更少的比特数，但是要保证至少16位的精度。
+
+正确的使用`平滑曲线段`和8位、16位的数据类型可以为常见路径数据(如字体符号)节省大量内存。使用更小的数据类型还可以在将路径数据从应用程序内存传输到`OpenVG`时节省总线带宽。
+| 数据类型  |`VG_PATH_DATATYPE_`后缀 | 字节数 | 值
+| ------- | ------- |------- |------- |
+|8位有符号整型|S_8|1|0|
+|16位有符号整型|S_16|2|1|
+|32位有符号整型|S_32|3|2|
+|IEEE 754格式浮点型|F|4|3|
+|||||
+
+**`VGPathDatatype`**
+`VGPathDatatype`枚举变量定义的坐标类型及其值描述如下
+```
+ypedef enum {
+    VG_PATH_DATATYPE_S_8  = 0,
+    VG_PATH_DATATYPE_S_16 = 1,
+    VG_PATH_DATATYPE_S_32 = 2,
+    VG_PATH_DATATYPE_F    = 3
+} VGPathDatatype;
+```
+
 ### 8.5.4 分段类型标记定义
+分段类型标记被定义为一个8位整型数据，其中高三位保留做以后使用，接下来的四位表示段命令类型，最低位表示坐标值的相对/绝对属性(`0`表示绝对坐标值，`1`表示相对坐标值)。保留位必须置为0。
+
+对于`CLOSE_PATH`段命令，表示相对/绝对坐标属性的`bit[0]`将被忽略。
+[图片](@todo)
+
+**`VGPathAbsRel`**
+
+`VGPathAbsRel`枚举变量描述了坐标的相对/绝对属性，其定义描述如下
+```
+typedef enum {
+    VG_ABSOLUTE = 0,
+    VG_RELATIVE = 1
+} VGPathAbsRel;
+```
+**`VGPathSegment`**
+`VGPathSegment`枚举变量定义了每一个段命令类型，其值被定义为`1`的移位,这样可以轻松的与`VGPathAbsRel`进行组合。其定义描述如下
+```
+typedef enum {
+    VG_CLOSE_PATH = ( 0 << 1),
+    VG_MOVE_TO    = ( 1 << 1),
+    VG_LINE_TO    = ( 2 << 1),
+    VG_HLINE_TO   = ( 3 << 1),
+    VG_VLINE_TO   = ( 4 << 1),
+    VG_QUAD_TO    = ( 5 << 1),
+    VG_CUBIC_TO   = ( 6 << 1),
+    VG_SQUAD_TO   = ( 7 << 1),
+    VG_SCUBIC_TO  = ( 8 << 1),
+    VG_SCCWARC_TO = ( 9 << 1),
+    VG_SCWARC_TO  = (10 << 1),
+    VG_LCCWARC_TO = (11 << 1),
+    VG_LCWARC_TO  = (12 << 1)
+} VGPathSegment;
+```
+
+**`VGPathCommand`**
+`VGPathCommand`枚举变量为每个`分段命令类型`和`坐标的绝对/相对值`定义了组合值。这些值与`VGPathAbsRel`中的适当值，以`按位或`（`|`)的方式获得完整的段命令值。其定义描述如下
+```
+typedef enum {
+    VG_MOVE_TO_ABS    = VG_MOVE_TO    | VG_ABSOLUTE,
+    VG_MOVE_TO_REL    = VG_MOVE_TO    | VG_RELATIVE,
+    VG_LINE_TO_ABS    = VG_LINE_TO    | VG_ABSOLUTE,
+    VG_LINE_TO_REL    = VG_LINE_TO    | VG_RELATIVE,
+    VG_HLINE_TO_ABS   = VG_HLINE_TO   | VG_ABSOLUTE,
+    VG_HLINE_TO_REL   = VG_HLINE_TO   | VG_RELATIVE,
+    VG_VLINE_TO_ABS   = VG_VLINE_TO   | VG_ABSOLUTE,
+    VG_VLINE_TO_REL   = VG_VLINE_TO   | VG_RELATIVE,
+    VG_QUAD_TO_ABS    = VG_QUAD_TO    | VG_ABSOLUTE,
+    VG_QUAD_TO_REL    = VG_QUAD_TO    | VG_RELATIVE,
+    VG_CUBIC_TO_ABS   = VG_CUBIC_TO   | VG_ABSOLUTE,
+    VG_CUBIC_TO_REL   = VG_CUBIC_TO   | VG_RELATIVE,
+    VG_SQUAD_TO_ABS   = VG_SQUAD_TO   | VG_ABSOLUTE,
+    VG_SQUAD_TO_REL   = VG_SQUAD_TO   | VG_RELATIVE,
+    VG_SCUBIC_TO_ABS  = VG_SCUBIC_TO  | VG_ABSOLUTE,
+    VG_SCUBIC_TO_REL  = VG_SCUBIC_TO  | VG_RELATIVE,
+    VG_SCCWARC_TO_ABS = VG_SCCWARC_TO | VG_ABSOLUTE,
+    VG_SCCWARC_TO_REL = VG_SCCWARC_TO | VG_RELATIVE,
+    VG_SCWARC_TO_ABS  = VG_SCWARC_TO  | VG_ABSOLUTE,
+    VG_SCWARC_TO_REL  = VG_SCWARC_TO  | VG_RELATIVE,
+    VG_LCCWARC_TO_ABS = VG_LCCWARC_TO | VG_ABSOLUTE,
+    VG_LCCWARC_TO_REL = VG_LCCWARC_TO | VG_RELATIVE,
+    VG_LCWARC_TO_ABS  = VG_LCWARC_TO  | VG_ABSOLUTE,
+    VG_LCWARC_TO_REL  = VG_LCWARC_TO  | VG_RELATIVE
+} VGPathCommand;
+```
+
 ### 8.5.5 路径例子
+下面的代码示例展示如何使用标准表示遍历存储在应用程序内存中的路径数据。一个字节包含了`段命令`，`段命令类型`，`相对/绝对标志`，由应用程序中定义的`SEGMENT_COMMAND`和`SEGMENT_ABS_REL`宏来提取。坐标的数量和每个坐标的字节数(对于给定的数据格式)也是通过查找表确定的。最后，与表示当前段的路径数据相关的部分被复制到一个临时缓冲区中，并作为用户定义的`processSegment`函数的参数，该函数可以执行进一步的处理。
+```
+#define PATH_MAX_COORDS 6 /* Maximum number of coordinates/command */
+#define PATH_MAX_BYTES  4 /* Bytes in largest data type */
+#define SEGMENT_COMMAND(command) ((command) & 0x1e)/* Extract segment type */ \
+#define SEGMENT_ABS_REL(command) ((command) & 0x1) /* Extract absolute/relative bit */ \
+
+/* Number of coordinates for each command */
+static const VGint numCoords[] = {0,2,2,1,1,4,6,2,4,5,5,5,5};
+/* Number of bytes for each datatype */
+static const VGint numBytes[] = {1,2,4,4};
+/* User‐defined function to process a single segment */
+extern void processSegment(VGPathSegment command, VGPathAbsRel absRel,
+                           VGPathDatatype datatype, void * segmentData);
+/* Process a path in the standard format, one segment at a time. */
+void processPath(const VGubyte * pathSegments, const void * pathData,
+                 int numSegments, VGPathDatatype datatype)
+{
+    VGubyte segmentType, segmentData[PATH_MAX_COORDS*PATH_MAX_BYTES];
+    VGint segIdx = 0, dataIdx = 0;
+    VGint command, absRel, numBytes;
+    while (segIdx < numSegments)
+    {
+        segmentType = pathSegments[segIdx++];
+        command     = SEGMENT_COMMAND(segmentType);
+        absRel      = SEGMENT_ABS_REL(segmentType);
+        numBytes    = numCoords[command]*numBytes[datatype];
+        /* Copy segment data for further processing */
+        memcpy(segmentData, &pathData[dataIdx], numBytes);
+        /* Process command */
+        processSegment(command, absRel, datatype, (void *) segmentData);
+        dataIdx    += numBytes;
+    }
+}
+```
+
 
 ## 8.6 路径操作 <span id = "路径操作"></span>
 ### 8.6.1 路径存储
